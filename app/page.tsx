@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { TALLY_LOCAL_BRIDGE_URL } from "@/lib/constants";
 import { splitHostAndPort, getCompanyXml } from "@/lib/utils";
 import axios from "axios";
 import {
@@ -51,25 +52,32 @@ export default function Home() {
 
       // Direct client-side connection to Tally
       // First, test basic connectivity
-      const testResponse = await axios.get(tallyServerUrl, {
-        headers: {
-          "Content-Type": "application/xml",
-          Accept: "application/xml",
-        },
-        timeout: 5000,
+      await axios.post(`${TALLY_LOCAL_BRIDGE_URL}/config`, {
+        host: host,
+        port: port,
       });
+
+      const result = await axios.get(
+        `${TALLY_LOCAL_BRIDGE_URL}/api/tally/test-connection`
+      );
+
+      console.log("Tally connection result:", result.data);
 
       // Get company information
       const companyXml = getCompanyXml();
-      const companyResponse = await axios.post(tallyServerUrl, companyXml, {
-        headers: {
-          "Content-Type": "application/xml",
-          Accept: "application/xml",
-        },
-        timeout: 5000,
-      });
+      const companyResponse = await axios.post(
+        `${TALLY_LOCAL_BRIDGE_URL}/api/tally`,
+        companyXml,
+        {
+          headers: {
+            "Content-Type": "application/xml",
+            Accept: "application/xml",
+          },
+          timeout: 5000,
+        }
+      );
 
-      console.log("Tally connection successful:", companyResponse.data);
+      console.log("company connection successful:", companyResponse.data);
       setIsConnected(true);
       setErrorMessage("");
     } catch (error: any) {
