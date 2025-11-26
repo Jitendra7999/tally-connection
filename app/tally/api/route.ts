@@ -4,8 +4,24 @@ import { XMLParser } from "fast-xml-parser";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * POST /tally-integration/api
+ * POST /tally/api
  * Test Tally connection via backend proxy
+ *
+ * ⚠️ IMPORTANT: This route is NOT used when deployed on Vercel
+ *
+ * This API route is included for scenarios where the backend has
+ * direct network access to the Tally server, such as:
+ * - Local development/testing
+ * - Deployment on VPS/dedicated servers in the same network as Tally
+ * - Internal company servers with direct Tally access
+ *
+ * For Vercel deployment, the frontend uses direct client-side connections
+ * to Tally (see app/page.tsx). This requires CORS to be enabled in Tally.
+ *
+ * Why this doesn't work on Vercel:
+ * - Vercel serverless functions run in the cloud
+ * - They cannot access localhost or private network IPs
+ * - Tally servers typically run on local/private networks
  */
 export async function POST(request: NextRequest) {
   let host: string = "";

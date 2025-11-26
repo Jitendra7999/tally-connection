@@ -11,10 +11,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { splitHostAndPort } from "@/lib/utils";
+import { splitHostAndPort, getCompanyXml } from "@/lib/utils";
 import axios from "axios";
-import { Loader2, PlayCircle, Wifi, WifiOff } from "lucide-react";
-import { CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  PlayCircle,
+  Wifi,
+  WifiOff,
+  CheckCircle2,
+  Info,
+} from "lucide-react";
 import { useState } from "react";
 
 export default function Home() {
@@ -38,26 +44,59 @@ export default function Home() {
     ) {
       currentUrl = `http://${currentUrl}`;
     }
+
     try {
       const { host, port } = splitHostAndPort(currentUrl);
-      const response = await axios.post("/tally/api", {
-        host,
-        port,
-        companyName,
+      const tallyServerUrl = `http://${host}:${port}`;
+
+      // Direct client-side connection to Tally
+      // First, test basic connectivity
+      const testResponse = await axios.get(tallyServerUrl, {
+        headers: {
+          "Content-Type": "application/xml",
+          Accept: "application/xml",
+        },
+        timeout: 5000,
       });
 
-      console.log(response.data);
+      // Get company information
+      const companyXml = getCompanyXml();
+      const companyResponse = await axios.post(tallyServerUrl, companyXml, {
+        headers: {
+          "Content-Type": "application/xml",
+          Accept: "application/xml",
+        },
+        timeout: 5000,
+      });
+
+      console.log("Tally connection successful:", companyResponse.data);
       setIsConnected(true);
       setErrorMessage("");
     } catch (error: any) {
       setIsConnected(false);
 
-      // Extract error message from API response
-      const errorMsg =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to connect to Tally server";
+      let errorMsg = "Failed to connect to Tally server";
+
+      if (axios.isAxiosError(error)) {
+        if (
+          error.code === "ERR_NETWORK" ||
+          error.message.includes("Network Error")
+        ) {
+          errorMsg = `Cannot connect to Tally at ${tallyUrl}:${tallyPort}. Please ensure:\n1. Tally Prime is running\n2. ODBC Server is enabled in Tally (Gateway → F11 → Enable ODBC)\n3. The IP and port are correct\n4. CORS is enabled on Tally`;
+        } else if (error.code === "ECONNREFUSED") {
+          errorMsg = `Connection refused. Tally Prime is not running at ${tallyUrl}:${tallyPort}`;
+        } else if (
+          error.code === "ETIMEDOUT" ||
+          error.code === "ECONNABORTED"
+        ) {
+          errorMsg = `Connection timeout. Tally server at ${tallyUrl}:${tallyPort} is not responding`;
+        } else {
+          errorMsg = error.message || "Unknown connection error";
+        }
+      } else {
+        errorMsg = error.message || "Failed to connect to Tally server";
+      }
+
       setErrorMessage(errorMsg);
       console.error("Connection error:", error);
     } finally {
@@ -83,6 +122,25 @@ export default function Home() {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-4">
+          <div className="flex items-start gap-2 text-blue-800 dark:text-blue-200">
+            <Info className="h-5 w-5 mt-0.5 shrink-0" />
+            <div className="flex-1 text-sm">
+              <span className="font-medium block mb-1">
+                Important Setup Requirements
+              </span>
+              <ul className="list-disc list-inside space-y-1 text-blue-700 dark:text-blue-300">
+                <li>Tally Prime must be running with ODBC Server enabled</li>
+                <li>CORS must be enabled in Tally for browser connections</li>
+                <li>Default port is 9000 (check your Tally settings)</li>
+              </ul>
+              <span className="block mt-2 text-xs">
+                See TALLY_SETUP.md for detailed configuration instructions
+              </span>
+            </div>
+          </div>
+        </div>
+
         {isConnected && (
           <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 p-4">
             <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
@@ -103,7 +161,9 @@ export default function Home() {
               <WifiOff className="h-5 w-5 mt-0.5 shrink-0" />
               <div className="flex-1">
                 <span className="font-medium block">Connection Failed</span>
-                <span className="text-sm mt-1 block">{errorMessage}</span>
+                <span className="text-sm mt-1 block whitespace-pre-line">
+                  {errorMessage}
+                </span>
               </div>
             </div>
           </div>
